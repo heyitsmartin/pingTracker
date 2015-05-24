@@ -15,22 +15,27 @@ public class inputHandler implements Runnable {
 	public void run() {
 		// TODO Auto-generated method stub
 		while(true) { 
+			String input = scanner.nextLine();
 			if(!pt.isBusy()){
-				String input = scanner.nextLine();
 				parseInput(input);
 			}
 		}
 	}
 	private void parseInput(String in ) { 
 		if( in.equalsIgnoreCase("EXIT")) { 
+			
 			pt.exit(); 
 		}else if( in.equalsIgnoreCase("ADDRESSES")){
 			pt.printAd();
 		}else if( in.equalsIgnoreCase("STOP")){
+			pt.write("chill");
 			pt.stop();
 		}else if( in.equalsIgnoreCase("TIME")) { 
 			pt.time();
+		}else if (in.equalsIgnoreCase("START")){
+			pt.start();
 		}else { 
+		
 		
 			pt.write("invalid input");
 		}

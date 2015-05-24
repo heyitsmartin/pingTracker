@@ -21,6 +21,7 @@ public class PingTracker implements Runnable {
 	int dest = -1;
 	int time = -1; 
 	int end = -1; 
+	boolean shouldRun = true;
 	long interval = -1; 
 	boolean systemOut= true; 
 	FileOutputStream fs = null ;
@@ -39,15 +40,16 @@ public class PingTracker implements Runnable {
 		list = new ArrayList<InetAddress>();
 		timer = new Timer();
 	}
-	public boolean isBusy() {
+	public synchronized boolean isBusy() {
 		return busy;
 	}
 	private void getDest() {
 		String input = "" ;
 		InetAddress address = null;
-		write("Which servers do you want me to track? \n Type \" END \" to stop "); 
 		
 		while(true){
+			write("Which servers do you want me to track? \n Type \" END \" to stop "); 
+			
 			input = scanner.nextLine(); 
 			write("Input: "+input);
 			if (input.equalsIgnoreCase("END")){ 
@@ -56,13 +58,16 @@ public class PingTracker implements Runnable {
 			}
 			
 			try{ 
+				write("Validating: "+input);
 				address = InetAddress.getByName(input); 
 				address.isReachable(3000);
 			}catch( UnknownHostException e ){ 
 				write("The host could not be found"); 
+				continue;
 			} catch (IOException e) {
 				write("host could not be reached" ) ; 
 				write( e.getMessage());
+				continue;
 			}
 			
 			
@@ -118,7 +123,7 @@ public class PingTracker implements Runnable {
 		for (int i = 0; i< result.length; i++ ) {
 			String word = result[i];
 			if( word.contains("time=")){ 
-				write(dateFormat.format(new Date()) + ": for : " +ad.getHostAddress()+" = "+ word.substring(word.indexOf('=')+1));
+				write("["+dateFormat.format(new Date()) + "]: for : " +ad.getHostAddress()+" = "+ word.substring(word.indexOf('=')+1));
 				
 			}else if (word.contains("Average")) { 
 				
@@ -142,18 +147,20 @@ public class PingTracker implements Runnable {
 	}
 	private void setInterval() { 
 		write("Give me an interval in minutes to ping"); 
-		String input = scanner.nextLine();
-		Long in =(long) -1;
-		while(true) { 
+		String input ;
+		double in =(double) -1;
+		while(shouldRun) { 
+			input = scanner.nextLine();
 			if(input.equalsIgnoreCase("END")){ 
 				break;
 			}
 			try{ 
-				in = Long.parseLong(input);
+				in = Double.parseDouble(input);
 				break;
 			}catch (IllegalArgumentException e) {
 				write(input + "  is not a valid number");
 				write("Try again or type \"END\' to use the default value");
+				
 			}
 		}
 		//convert from minutes to ms 
@@ -162,14 +169,20 @@ public class PingTracker implements Runnable {
 			interval = 15 * 60000; 
 		}else { 
 			write("Using "+in+" minutes");
-			interval = in * 60000 ;
+			interval = (long)(in * 60000 );
 		}
 		
 		
 		
 	}
+	public void start() { 
+		write("restarting service");
+		shouldRun =true;
+		this.startFunction();
+	}
 	public void stop()  {
 		timer.cancel();
+		shouldRun = false; 
 		write("Stopped pinging");
 	}
 	public void printAd () { 
@@ -182,36 +195,49 @@ public class PingTracker implements Runnable {
 		write("Stopping service.. "); 
 		System.exit(0);
 	}
-
-	@Override
-	public void run() {
+	public void startFunction() { 
 		class PingTimer extends TimerTask { 
 			public void run() { 
 				ping();
 				
 			}
 		}
+		(new Thread(new inputHandler(this))).start();
+		timer = new Timer();
+		timer.scheduleAtFixedRate(new PingTimer(), 0,interval);
+		while(shouldRun) { 
+			//wait til the ping command is finished running
+			while(isBusy()){
+				
+				
+			}
+
+			this.stime = System.currentTimeMillis();
+			write(dateFormat.format(new Date()) + ": Waiting for " + interval/60000 + " minutes");
+			write("Avaiable commands are ADDRESSES/EXIT "); 
+			try {
+				Thread.sleep(interval);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				break;
+			}
+		
+
+			
+			
+		}
+	}
+	@Override
+	public void run() {
+		
 		inputHandler ih = new inputHandler(this);
 		getDest();
 		setInterval();
 		write("Starting requests...");
 		ping();
-		(new Thread(new inputHandler(this))).start();
-		while(true) { 
-			write("hi");
-			timer.schedule(new PingTimer(), interval);
-			this.stime = System.currentTimeMillis();
-			write(dateFormat.format(new Date()) + ": Waiting for " + interval/60000 + " minutes");
-			write("Avaiable commands are STOP/ADDRESSES/EXIT "); 
-			try {
-				Thread.sleep(interval+1000);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
-			
-		}
+		
+		startFunction();
 		
 		
 	}
